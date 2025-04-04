@@ -1,0 +1,6 @@
+[
+    { "title": "Radio 10", "url": "https://radio10.stweb.tv/radio10/live/playlist.m3u8" },
+    { "title": "Nacional AM870", "url": "https://sa.mp3.icecast.magma.edge-access.net:7200/sc_rad1" },
+    { "title": "Rock & Pop", "url": "http://rockandpop.fm:8000/rockandpop.mp3" },
+    { "title": "Urbana Play", "url": "https://cdn.instream.audio:9660/stream" }
+]  
