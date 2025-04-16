@@ -1,6 +1,6 @@
 [
     { "title": "Radio 10", "url": "https://radio10.stweb.tv/radio10/live/playlist.m3u8" },
-    { "title": "Nacional AM870", "url": "https://sa.mp3.icecast.magma.edge-access.net:7200/sc_rad1" },
-    { "title": "Rock & Pop", "url": "http://rockandpop.fm:8000/rockandpop.mp3" },
-    { "title": "Urbana Play", "url": "https://cdn.instream.audio:9660/stream" }
+    { "title": "Urbana Play", "url": "https://cdn.instream.audio:9660/stream" },
+    { "title": "Vorterix", "url": "https://ice2.edge-apps.net/radio1_high-20057.audio" },
+    { "title": "Futurock", "url": "https://cdn.instream.audio:9112/stream" }
 ]  
