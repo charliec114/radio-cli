@@ -21,16 +21,61 @@ class RadioCLI:
         self.radios = []
         self.screen = None
         self.scroll_offset = 0  # Para el scroll de estaciones
+        self.search_mode = False  # Modo de búsqueda
+        self.search_query = ""  # Consulta de búsqueda
+        self.filtered_radios = []  # Estaciones filtradas por búsqueda
         
     def load_radios(self, json_file: str = "radios.json") -> bool:
         """Cargar estaciones de radio desde archivo JSON"""
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
                 self.radios = json.load(f)
+            
+            # Ordenar estaciones: recientes primero, luego alfabéticamente
+            self.sort_stations()
+            
             return True
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Error cargando {json_file}: {e}")
             return False
+    
+    def sort_stations(self):
+        """Ordenar estaciones alfabéticamente por título"""
+        if not self.radios:
+            return
+        
+        # Ordenar alfabéticamente por título (ignorando mayúsculas/minúsculas)
+        self.radios.sort(key=lambda x: x['title'].lower())
+        
+        # Inicializar estaciones filtradas
+        self.filtered_radios = self.radios.copy()
+    
+    def search_stations(self, query: str):
+        """Buscar estaciones por título"""
+        if not query.strip():
+            self.search_mode = False
+            self.search_query = ""
+            self.filtered_radios = self.radios.copy()
+            self.selected = 0
+            self.scroll_offset = 0
+            return
+        
+        self.search_mode = True
+        self.search_query = query.lower()
+        
+        # Filtrar estaciones que contengan la consulta
+        self.filtered_radios = [
+            radio for radio in self.radios 
+            if self.search_query in radio['title'].lower()
+        ]
+        
+        # Resetear selección y scroll
+        self.selected = 0
+        self.scroll_offset = 0
+    
+    def get_display_radios(self):
+        """Obtener estaciones a mostrar (filtradas o todas)"""
+        return self.filtered_radios if self.search_mode else self.radios
     
     def draw_box(self, y: int, x: int, height: int, width: int, title: str = ""):
         """Dibujar un marco con título"""
@@ -123,10 +168,27 @@ class RadioCLI:
         line_x = max(0, (width - len(line)) // 2)
         self.screen.addstr(2, line_x, line, curses.color_pair(4))
         
+        # Barra de búsqueda
+        search_y = 3
+        search_label = "🔍 Buscar: "
+        search_x = max(2, (width - len(search_label) - 30) // 2)
+        
+        self.screen.addstr(search_y, search_x, search_label, curses.color_pair(3))
+        
+        # Mostrar consulta de búsqueda actual
+        if self.search_mode:
+            search_display = f"[{self.search_query}]"
+            self.screen.addstr(search_y, search_x + len(search_label), search_display, curses.color_pair(6))
+            # Mostrar número de resultados
+            results_info = f" ({len(self.filtered_radios)} resultados)"
+            self.screen.addstr(search_y, search_x + len(search_label) + len(search_display), results_info, curses.color_pair(4))
+        else:
+            self.screen.addstr(search_y, search_x + len(search_label), "Presiona '/' para buscar", curses.color_pair(7))
+        
         # Panel principal de estaciones (más ancho y centrado)
         stations_width = min(70, width - 10)
         stations_x = max(2, (width - stations_width) // 2)
-        stations_height = min(height - 12, height - 8)
+        stations_height = min(height - 15, height - 11)  # Reducir altura para dar espacio a la búsqueda
         
         # Marco para estaciones
         # Mostrar estaciones con mejor formato y scroll
@@ -134,7 +196,7 @@ class RadioCLI:
         max_visible = stations_height - 3
         
         # Calcular qué estaciones mostrar basado en el scroll
-        visible_radios = self.radios[self.scroll_offset:self.scroll_offset + max_visible]
+        visible_radios = self.get_display_radios()[self.scroll_offset:self.scroll_offset + max_visible]
         
         for i, radio in enumerate(visible_radios):
             if start_y + i < height - 1:
@@ -145,8 +207,8 @@ class RadioCLI:
                 station_num = f"{actual_index + 1:2d}."
                 self.screen.addstr(y_pos, stations_x + 2, station_num, curses.color_pair(3))
                 
+                # Estación seleccionada
                 if actual_index == self.selected:
-                    # Estación seleccionada
                     self.screen.addstr(y_pos, stations_x + 6, "▶ ", curses.color_pair(2))
                     self.screen.addstr(y_pos, stations_x + 8, radio['title'], curses.color_pair(2) | curses.A_BOLD)
                     
@@ -167,18 +229,18 @@ class RadioCLI:
             if scroll_up_y >= 0:
                 self.screen.addstr(scroll_up_y, stations_x + stations_width // 2 - 3, "↑ ↑ ↑", curses.color_pair(3))
         
-        if self.scroll_offset + max_visible < len(self.radios):
+        if self.scroll_offset + max_visible < len(self.get_display_radios()):
             # Indicador de que hay más abajo
             scroll_down_y = start_y + max_visible
             if scroll_down_y < height - 1:
                 self.screen.addstr(scroll_down_y, stations_x + stations_width // 2 - 3, "↓ ↓ ↓", curses.color_pair(3))
         
         # Mostrar información de scroll en el título del marco
-        if len(self.radios) > max_visible:
-            scroll_info = f"📻 ESTACIONES ({len(self.radios)}) - Scroll {self.scroll_offset + 1}-{min(self.scroll_offset + max_visible, len(self.radios))}"
+        if len(self.get_display_radios()) > max_visible:
+            scroll_info = f"📻 ESTACIONES ({len(self.get_display_radios())}) - Scroll {self.scroll_offset + 1}-{min(self.scroll_offset + max_visible, len(self.get_display_radios()))}"
             self.draw_box(4, stations_x, stations_height, stations_width, scroll_info)
         else:
-            self.draw_box(4, stations_x, stations_height, stations_width, f"📻 ESTACIONES ({len(self.radios)})")
+            self.draw_box(4, stations_x, stations_height, stations_width, f"📻 ESTACIONES ({len(self.get_display_radios())})")
         
         # Panel de controles y estado (abajo, centrado)
         controls_width = min(60, width - 10)
@@ -194,38 +256,45 @@ class RadioCLI:
             self.screen.addstr(controls_y + 1, controls_x + 25, "←/→: Volumen", curses.color_pair(3))
             self.screen.addstr(controls_y + 1, controls_x + 45, "Enter: Play/Pause", curses.color_pair(3))
             
-            # Segunda fila: Estado de reproducción
-            self.screen.addstr(controls_y + 2, controls_x + 2, "Estado:")
+            # Segunda fila: Controles adicionales
+            self.screen.addstr(controls_y + 2, controls_x + 2, "/: Buscar", curses.color_pair(3))
+            self.screen.addstr(controls_y + 2, controls_x + 25, "ESC: Cancelar búsqueda", curses.color_pair(3))
+            self.screen.addstr(controls_y + 2, controls_x + 50, "q: Salir", curses.color_pair(3))
+            
+            # Tercera fila: Estado de reproducción
+            self.screen.addstr(controls_y + 3, controls_x + 2, "Estado:")
             if self.playing:
-                self.screen.addstr(controls_y + 2, controls_x + 10, "▶ Reproduciendo", curses.color_pair(2))
+                self.screen.addstr(controls_y + 3, controls_x + 10, "▶ Reproduciendo", curses.color_pair(2))
             else:
-                self.screen.addstr(controls_y + 2, controls_x + 10, "⏸ Pausado", curses.color_pair(1))
+                self.screen.addstr(controls_y + 3, controls_x + 10, "⏸ Pausado", curses.color_pair(1))
             
-            # Tercera fila: Estación actual
-            self.screen.addstr(controls_y + 3, controls_x + 2, "Estación:")
+            # Cuarta fila: Estación actual
+            self.screen.addstr(controls_y + 4, controls_x + 2, "Estación:")
             if self.current_station:
-                self.screen.addstr(controls_y + 3, controls_x + 12, self.current_station, curses.color_pair(6))
+                self.screen.addstr(controls_y + 4, controls_x + 12, self.current_station, curses.color_pair(6))
             else:
-                self.screen.addstr(controls_y + 3, controls_x + 12, "Ninguna seleccionada", curses.color_pair(7))
+                self.screen.addstr(controls_y + 4, controls_x + 12, "Ninguna seleccionada", curses.color_pair(7))
             
-            # Cuarta fila: Volumen con barra integrada
-            self.screen.addstr(controls_y + 4, controls_x + 2, "Volumen:")
+            # Quinta fila: Volumen con barra integrada
+            self.screen.addstr(controls_y + 5, controls_x + 2, "Volumen:")
             volume_bar_width = min(30, controls_width - 15)
             volume_bar_x = controls_x + 12
-            self.draw_progress_bar(controls_y + 4, volume_bar_x, volume_bar_width, self.volume, "")
+            self.draw_progress_bar(controls_y + 5, volume_bar_x, volume_bar_width, self.volume, "")
             
-            # Quinta fila: Información adicional
-            self.screen.addstr(controls_y + 5, controls_x + 2, f"Estación {self.selected + 1} de {len(self.radios)}", curses.color_pair(3))
-            self.screen.addstr(controls_y + 5, controls_x + 35, "q: Salir", curses.color_pair(3))
+            # Sexta fila: Información adicional
+            self.screen.addstr(controls_y + 6, controls_x + 2, f"Estación {self.selected + 1} de {len(self.get_display_radios())}", curses.color_pair(3))
+            if self.search_mode:
+                self.screen.addstr(controls_y + 6, controls_x + 35, "🔍 Búsqueda activa", curses.color_pair(4))
+            self.screen.addstr(controls_y + 6, controls_x + 55, "q: Salir", curses.color_pair(3))
             
             # Línea separadora
-            separator_y = controls_y + 6
+            separator_y = controls_y + 7
             if separator_y < height - 1:
                 separator_line = "─" * (controls_width - 4)
                 self.screen.addstr(separator_y, controls_x + 2, separator_line, curses.color_pair(4))
                 
                 # Información de ayuda
-                help_text = "💡 Usa las flechas para navegar y ajustar volumen"
+                help_text = "💡 Usa las flechas para navegar, '/' para buscar y ajustar volumen"
                 help_x = max(0, (width - len(help_text)) // 2)
                 if separator_y + 1 < height - 1:
                     self.screen.addstr(separator_y + 1, help_x, help_text, curses.color_pair(3))
@@ -263,8 +332,8 @@ class RadioCLI:
             self.mpv_pid = None
         else:
             # Iniciar reproducción
-            if self.radios:
-                radio = self.radios[self.selected]
+            if self.get_display_radios():
+                radio = self.get_display_radios()[self.selected]
                 self.current_station = radio['title']
                 
                 try:
@@ -279,6 +348,49 @@ class RadioCLI:
                     self.playing = True
                 except Exception as e:
                     self.current_station = f"Error: {e}"
+    
+    def activate_search(self):
+        """Activar modo de búsqueda y permitir al usuario escribir"""
+        # Guardar estado actual de la terminal
+        curses.echo()
+        curses.nocbreak()
+        
+        # Mostrar prompt de búsqueda
+        self.screen.clear()
+        height, width = self.screen.getmaxyx()
+        
+        # Título
+        title = "🔍 BÚSQUEDA DE ESTACIONES"
+        title_x = (width - len(title)) // 2
+        self.screen.addstr(height // 2 - 2, title_x, title, curses.color_pair(4) | curses.A_BOLD)
+        
+        # Prompt
+        prompt = "Escribe tu búsqueda (Enter para buscar, ESC para cancelar):"
+        prompt_x = (width - len(prompt)) // 2
+        self.screen.addstr(height // 2, prompt_x, prompt, curses.color_pair(3))
+        
+        # Línea de entrada
+        input_x = (width - 40) // 2
+        self.screen.addstr(height // 2 + 1, input_x, "_" * 40, curses.color_pair(7))
+        
+        # Posicionar cursor
+        self.screen.addstr(height // 2 + 1, input_x, "", curses.color_pair(7))
+        self.screen.refresh()
+        
+        try:
+            # Leer entrada del usuario
+            query = self.screen.getstr(height // 2 + 1, input_x, 40).decode('utf-8')
+            
+            # Realizar búsqueda
+            self.search_stations(query)
+            
+        except (KeyboardInterrupt, EOFError):
+            # Cancelar búsqueda
+            self.search_stations("")
+        
+        # Restaurar estado de la terminal
+        curses.noecho()
+        curses.cbreak()
     
     def run(self):
         """Ejecutar la aplicación principal"""
@@ -309,31 +421,38 @@ class RadioCLI:
                 
                 if key == ord('q'):
                     break
+                elif key == ord('/'):
+                    # Activar modo búsqueda
+                    self.activate_search()
+                elif key == ord('\x1b'):  # ESC
+                    # Cancelar búsqueda
+                    if self.search_mode:
+                        self.search_stations("")
                 elif key == curses.KEY_UP:
                     if self.selected > 0:
                         self.selected -= 1
                         # Ajustar scroll si es necesario
                         if self.selected < self.scroll_offset:
                             self.scroll_offset = self.selected
-                    elif len(self.radios) > 0:
+                    elif len(self.get_display_radios()) > 0:
                         # Ir a la última estación (wrap around)
-                        self.selected = len(self.radios) - 1
+                        self.selected = len(self.get_display_radios()) - 1
                         # Ajustar scroll para mostrar la última estación
                         screen_height, _ = self.screen.getmaxyx()
-                        stations_height = min(screen_height - 12, screen_height - 8)
+                        stations_height = min(screen_height - 15, screen_height - 11)
                         max_visible = stations_height - 3
-                        if len(self.radios) > max_visible:
-                            self.scroll_offset = max(0, len(self.radios) - max_visible)
+                        if len(self.get_display_radios()) > max_visible:
+                            self.scroll_offset = max(0, len(self.get_display_radios()) - max_visible)
                 elif key == curses.KEY_DOWN:
-                    if self.selected < len(self.radios) - 1:
+                    if self.selected < len(self.get_display_radios()) - 1:
                         self.selected += 1
                         # Ajustar scroll si es necesario
                         screen_height, _ = self.screen.getmaxyx()
-                        stations_height = min(screen_height - 12, screen_height - 8)
+                        stations_height = min(screen_height - 15, screen_height - 11)
                         max_visible = stations_height - 3
                         if self.selected >= self.scroll_offset + max_visible:
                             self.scroll_offset = self.selected - max_visible + 1
-                    elif len(self.radios) > 0:
+                    elif len(self.get_display_radios()) > 0:
                         # Ir a la primera estación (wrap around)
                         self.selected = 0
                         self.scroll_offset = 0
