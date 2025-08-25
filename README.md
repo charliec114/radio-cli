@@ -2,6 +2,10 @@
 
 Reproductor de radio en línea de comandos con interfaz ncurses implementada en Python.
 
+![Radio CLI Interface](screenshot.png)
+
+*Interfaz moderna con sistema de scroll inteligente y control de volumen integrado*
+
 ## Características técnicas
 
 - **Interfaz**: ncurses con manejo de colores y caracteres Unicode
