@@ -1,0 +1,21 @@
+# Radio CLI - Dependencias de Python
+# Este archivo lista las dependencias necesarias para ejecutar radio.py
+
+# Dependencias del sistema (no instalables via pip):
+# - mpv (reproductor multimedia)
+# - terminal con soporte para ncurses
+
+# Dependencias de Python incluidas en la biblioteca estándar:
+# - curses (ncurses para Python) - Python 3.6+
+# - json (procesamiento de JSON) - Python 3.6+
+# - subprocess (ejecución de procesos) - Python 3.6+
+# - os (operaciones del sistema) - Python 3.6+
+# - signal (manejo de señales) - Python 3.6+
+# - sys (funciones del sistema) - Python 3.6+
+# - typing (anotaciones de tipo) - Python 3.5+ (List, Dict, Optional)
+
+# Nota: No se requieren paquetes externos de pip ya que todas las dependencias
+# están incluidas en la biblioteca estándar de Python 3.6+
+
+# Versión mínima de Python requerida: 3.6+
+# (typing está disponible desde 3.5, pero curses tiene mejor soporte desde 3.6)
